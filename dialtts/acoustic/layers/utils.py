@@ -151,7 +151,7 @@ class Swish(nn.Module):
         return 'num_parameters={}'.format(self.num_parameters)
 
 
-class ConditionalLayerNorm(nn.Module):
+class CondLayerNorm(nn.Module):
     
     __constants__ = ['input_size', 'embed_size', 'eps']
     input_size: int
@@ -162,9 +162,9 @@ class ConditionalLayerNorm(nn.Module):
         self,
         input_size,
         embed_size,
-        epsilon=1e-5,
+        eps=1e-5,
     ):
-        super(ConditionalLayerNorm, self).__init__()
+        super(CondLayerNorm, self).__init__()
         
         self.input_size = input_size
         self.embed_size = embed_size
@@ -174,7 +174,7 @@ class ConditionalLayerNorm(nn.Module):
         self.reset_parameters()
         
     def reset_parameters(self):
-        u = 1.0/float(embed_size)
+        u = 1.0/float(self.embed_size)
         nn.init.uniform_(self.scale_layer.weight, 0, u)
         nn.init.uniform_(self.bias_layer.weight, -u, u)
         nn.init.zeros_(self.scale_layer.bias)
@@ -183,7 +183,7 @@ class ConditionalLayerNorm(nn.Module):
     def forward(self, x, s):
         # input: (B,T,C)
         # s: speaker embeded, (B,C)
-        x = F.layer_norm(x, (self.input_size,), eps=self.eps)
+        y = F.layer_norm(x, (self.input_size,), eps=self.eps)
         
         scale = self.scale_layer(s)
         bias = self.bias_layer(s)

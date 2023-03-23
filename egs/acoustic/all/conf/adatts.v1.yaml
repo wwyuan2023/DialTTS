@@ -15,7 +15,7 @@ hop_size_ms: 12
 ###########################################################
 #         GENERATOR NETWORK ARCHITECTURE SETTING          #
 ###########################################################
-generator_type: "FasTTS"
+generator_type: "AdaTTS"
 generator_params:
     num_speaker: *num_speaker
     num_text: *num_text

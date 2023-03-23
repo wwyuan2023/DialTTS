@@ -7,14 +7,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from dialtts.acoustic.layers import LinearGLU, Conv1dGLU
-from dialtts.acoustic.layers import FFTBlock, GCLBlock
-from dialtts.acoustic.layers import MaskedGroupNorm, ChannelNorm
+from dialtts.acoustic.layers import FFTBlock, GCLBlock, CondFFTBlock
+from dialtts.acoustic.layers import MaskedGroupNorm, ChannelNorm, CondLayerNorm
 from dialtts.acoustic.utils import get_mask_from_lengths
 
 
 class FFTNet(nn.Module):
     def __init__(
-        self,
+        self, *,
         num_layer=4,
         num_head=4,
         num_hidden=256,
@@ -50,6 +50,51 @@ class FFTNet(nn.Module):
         encoded = inputs
         for f in self.blocks:
             encoded = f(encoded, attn_masked_fill, feed_masked_fill)
+        
+        return encoded # (B, N, c)
+
+
+class CondFFTNet(nn.Module):
+    def __init__(
+        self,
+        speaker_size, *,
+        num_layer=4,
+        num_head=4,
+        num_hidden=256,
+        filter_size=512,
+        kernel_size=9,
+        group_size=4,
+        dropout_rate=0.1,
+        attention_type = "scale",
+    ):
+        super(CondFFTNet, self).__init__()
+        self.num_head = num_head
+        
+        self.blocks = nn.ModuleList([
+            CondFFTBlock(
+                speaker_size,
+                num_head, num_hidden, num_hidden//num_head,
+                filter_size, kernel_size, group_size,
+                dropout_rate=dropout_rate,
+                attention_type=attention_type,
+            ) for _ in range(num_layer)
+        ])
+    
+    def forward(self, inputs, spk_embed, mask=None):
+        # inputs: (B, N, c)
+        # spk_embed: (B, s)
+        # mask: (B, N, 1)
+        if mask is not None:
+            attn_masked_fill = mask.repeat(1, 1, inputs.size(1)) # (B, N, N)
+            attn_masked_fill = attn_masked_fill.unsqueeze(1) # (B, 1, N, N)
+            attn_masked_fill = ~attn_masked_fill
+            feed_masked_fill = ~mask # (B, N, 1)
+        else:
+            attn_masked_fill, feed_masked_fill = None, None
+        
+        encoded = inputs
+        for f in self.blocks:
+            encoded = f(encoded, spk_embed, attn_masked_fill, feed_masked_fill)
         
         return encoded # (B, N, c)
 
@@ -419,8 +464,8 @@ class PhonemeAdaptor(nn.Module):
     ):
         super(PhonemeAdaptor, self).__init__()
         
-        self.fc = LinearGLU(speaker_size, num_hidden)
-        self.fftnet = FFTNet(
+        self.condfftnet = CondFFTNet(
+            speaker_size,
             num_layer=num_layer,
             num_head=num_head,
             num_hidden=num_hidden,
@@ -435,9 +480,7 @@ class PhonemeAdaptor(nn.Module):
         # x: (B,N,c)
         # s: (B,s)
         # mask: (B,N,1)
-        s = self.fc(s).unsqueeze(1) # (B,1,c)
-        x = x + s # (B,N,c)
-        x = self.fftnet(x, mask) # (B,N,c)
+        x = self.condfftnet(x, s, mask) # (B,N,c)
         return x
 
 
@@ -456,8 +499,8 @@ class UtteranceAdaptor(nn.Module):
     ):
         super(UtteranceAdaptor, self).__init__()
         
-        self.fc = LinearGLU(speaker_size, num_hidden)
-        self.fftnet = FFTNet(
+        self.condfftnet = CondFFTNet(
+            speaker_size,
             num_layer=num_layer,
             num_head=num_head,
             num_hidden=num_hidden,
@@ -472,9 +515,7 @@ class UtteranceAdaptor(nn.Module):
         # x: (B,T,d)
         # s: (B,s)
         # mask: (B,T,1)
-        s = self.fc(s).unsqueeze(1) # (B,1,d)
-        x = x + s # (B,T,d)
-        x = self.fftnet(x, mask) # (B,T,d)
+        x = self.condfftnet(x, s, mask) # (B,T,d)
         return x
 
 
@@ -551,7 +592,7 @@ class VarianceAdaptor(nn.Module):
         return expanded, duration_rounded
 
 
-class FasTTS(nn.Module):
+class AdaTTS(nn.Module):
     def __init__(
         self,
         num_speaker=1024,
@@ -614,7 +655,7 @@ class FasTTS(nn.Module):
             "dropout_rate": 0.1,
         },
     ):
-        super(FasTTS, self).__init__()
+        super(AdaTTS, self).__init__()
         
         hidden_size = text_encoder_params["num_hidden"]
         
@@ -735,7 +776,7 @@ class FasTTS(nn.Module):
 
 if __name__ == "__main__":
     
-    f = FasTTS()
+    f = AdaTTS()
     print(f)
     
     # spkid: (B,)
