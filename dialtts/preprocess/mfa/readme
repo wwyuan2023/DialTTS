@@ -1,0 +1,17 @@
+
+1. MFA install
+https://montreal-forced-aligner.readthedocs.io/en/latest/installation.html
+
+conda create -n aligner -c conda-forge montreal-forced-aligner
+conda activate aligner
+pip install speechbrain -i https://mirrors.aliyun.com/pypi/simple/
+
+
+2. train model
+mfa train -c train.yaml --single_speaker --output_directory ./align ./dataset/00001/ ./dataset/lily.dict model/lily
+
+
+3. forced-alignment
+unzip ./model/lily.zip
+mfa align -c train.yaml --single_speaker ./dataset/00001/ ./dataset/lily.dict ./lily ./align
+

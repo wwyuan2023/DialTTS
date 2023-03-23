@@ -1,0 +1,150 @@
+# You need to change the setting depneding on your dataset.
+
+###########################################################
+#                FEATURE EXTRACTION SETTING               #
+###########################################################
+
+num_text: &num_text
+    192
+num_mel: &num_mel
+    48
+num_speaker: &num_speaker
+    1024
+hop_size_ms: 12
+
+###########################################################
+#         GENERATOR NETWORK ARCHITECTURE SETTING          #
+###########################################################
+generator_type: "FasTTS"
+generator_params:
+    num_speaker: *num_speaker
+    num_text: *num_text
+    num_mel: *num_mel
+    
+    text_encoder_params:
+        num_layer: 4
+        num_head: 4
+        num_hidden: 256
+        filter_size: 512
+        kernel_size: 9
+        group_size: 4
+        dropout_rate: 0.1
+    mel_decoder_params:
+        num_layer: 4
+        num_head: 4
+        num_hidden: 256
+        filter_size: 512
+        kernel_size: 9
+        group_size: 4
+        dropout_rate: 0.1
+    postnet_params:
+        num_layer: 4
+        num_input: 256
+        num_hidden: 256
+        kernel_size: 17
+        group_size: 4
+        dropout_rate: 0.1
+    phoneme_adaptor_params:
+        num_layer: 2
+        num_head: 4
+        num_hidden: 256
+        filter_size: 512
+        kernel_size: 9
+        group_size: 4
+        dropout_rate: 0.1
+    utterance_adaptor_params:
+        num_layer: 2
+        num_head: 4
+        num_hidden: 256
+        filter_size: 512
+        kernel_size: 9
+        group_size: 4
+        dropout_rate: 0.1
+    variance_adaptor_params:
+        num_energy: 8
+    energy_params:
+        num_layer: 4
+        num_head: 4
+        num_hidden: 256
+        filter_size: 512
+        kernel_size: 9
+        group_size: 4
+        dropout_rate: 0.1
+
+
+###########################################################
+#       DISCRIMINATOR NETWORK ARCHITECTURE SETTING        #
+###########################################################
+discriminator_type: "MultiPatchNet"
+discriminator_params:
+    in_channels: 48
+    out_channels: 1
+    num_layers: [4, 4, 4, 4]
+    kernel_size: [5, 5, 5, 5]
+    stride: [1, 1, 1, 1]
+    dilation: [1, 2, 4, 8]
+    conv_channels: [128, 128, 128, 128]
+    use_weight_norm: [true, true, true, true]
+
+
+###########################################################
+#                       LOSS SETTING                      #
+###########################################################
+lambda_dur: 1.0
+lambda_energy: 1.0
+lambda_adv: 1.0
+
+
+###########################################################
+#                  DATA LOADER SETTING                    #
+###########################################################
+batch_size: 8
+batch_max_steps: 512
+pin_memory: true
+num_workers: 4
+
+
+###########################################################
+#             OPTIMIZER & SCHEDULER SETTING               #
+###########################################################
+
+generator_optimizer_type: "Adam"
+generator_optimizer_params:
+    lr: 0.001
+    betas: [0.9, 0.98]
+    eps: 1.0e-9
+    weight_decay: 0.0
+
+generator_scheduler_type: "WarmupDecayLR"
+generator_scheduler_params:
+    step_size: 30000
+    lr_floor: 1.0e-5
+generator_grad_norm: 5
+
+discriminator_optimizer_type: "RAdam"
+discriminator_optimizer_params:
+    lr: 0.0001
+    betas: [0.9, 0.98]
+    eps: 1.0e-9
+    weight_decay: 0.01
+
+discriminator_scheduler_type: "StepLR"
+discriminator_scheduler_params:
+    step_size: 1000000
+    gamma: 0.5
+discriminator_grad_norm: 1
+
+###########################################################
+#                    INTERVAL SETTING                     #
+###########################################################
+train_max_steps: 1000000
+discriminator_train_start_steps: 300000
+save_interval_steps: 1000
+eval_interval_steps: 10000
+log_interval_steps: 1000
+
+###########################################################
+#                     OTHER SETTING                       #
+###########################################################
+num_save_intermediate_results: 8
+

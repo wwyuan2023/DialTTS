@@ -1,0 +1,125 @@
+# You need to change the setting depneding on your dataset.
+
+###########################################################
+#                FEATURE EXTRACTION SETTING               #
+###########################################################
+
+sampling_rate: 8000
+hop_size: 96
+num_mel: &num_mel
+    48
+
+
+# pqmf params.
+num_band: &num_band
+    2
+taps: 14
+beta: 7.0
+
+
+###########################################################
+#         GENERATOR NETWORK ARCHITECTURE SETTING          #
+###########################################################
+generator_type: "HiFiGANGenerator"
+generator_params:
+    in_channels: *num_mel
+    out_channels: *num_band
+    kernel_size: 9
+    resblock_class: "ResBlock3"
+    resblock_kernel_sizes: [3, 7, 11]
+    resblock_dilation_sizes: [[1,3,5], [1,3,5], [1,3,5]]
+    upsample_initial_channels: 512
+    upsample_scales: [2, 4, 6]
+    use_weight_norm: true
+
+
+###########################################################
+#       DISCRIMINATOR NETWORK ARCHITECTURE SETTING        #
+###########################################################
+discriminator_type: "Discriminators3"
+discriminator_params:
+    multi_wave_discriminator_params:
+        num_dwt: 3
+        kernel_size: 5
+        layers: 10
+        conv_channels: 48
+        use_weight_norm: true
+    multi_stft_discriminator_params:
+        fft_sizes: [128, 256, 512, 1024]
+        hop_sizes: [32, 64, 128, 256]
+        win_sizes: [128, 256, 512, 1024]
+        window: "hann_window"
+        num_layers: [5, 6, 7, 8]
+        kernel_sizes: [5, 5, 5, 5]
+        conv_channels: [64, 64, 64, 64]
+        use_weight_norm: true
+
+###########################################################
+#                       LOSS SETTING                      #
+###########################################################
+lambda_stft: 1.0
+lambda_adv: 1.0
+
+stft_loss_params:
+    fft_sizes: [128, 256, 512, 1024]
+    hop_sizes: [32, 64, 128, 256]
+    win_sizes: [128, 256, 512, 1024]
+    window: "hann_window"
+
+use_suband_stft_loss: true
+stft_loss_params:
+    fft_sizes: [64, 128, 256, 512]
+    hop_sizes: [16, 32, 64, 128]
+    win_sizes: [64, 128, 256, 512]
+    window: "hann_window"
+
+###########################################################
+#                  DATA LOADER SETTING                    #
+###########################################################
+batch_size: 8
+batch_max_steps: 20000
+pin_memory: true
+num_workers: 2
+
+###########################################################
+#             OPTIMIZER & SCHEDULER SETTING               #
+###########################################################
+
+generator_optimizer_type: "RAdam"
+generator_optimizer_params:
+    lr: 0.0001
+    eps: 1.0e-6
+    weight_decay: 0.01
+
+generator_scheduler_type: "StepLR"
+generator_scheduler_params:
+    step_size: 1000000
+    gamma: 0.85
+generator_grad_norm: 5
+
+discriminator_optimizer_type: "RAdam"
+discriminator_optimizer_params:
+    lr: 0.0001
+    eps: 1.0e-6
+    weight_decay: 0.0
+
+discriminator_scheduler_type: "StepLR"
+discriminator_scheduler_params:
+    step_size: 1000000
+    gamma: 0.85
+discriminator_grad_norm: 1
+
+###########################################################
+#                    INTERVAL SETTING                     #
+###########################################################
+train_max_steps: 1000000
+discriminator_train_start_steps: 000000
+save_interval_steps: 1000
+eval_interval_steps: 10000
+log_interval_steps: 1000
+
+###########################################################
+#                     OTHER SETTING                       #
+###########################################################
+num_save_intermediate_results: 8
+
